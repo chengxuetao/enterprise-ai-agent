@@ -1,0 +1,133 @@
+# ============================================================================
+# Enterprise AI Agent 配置
+# 版本基线：Spring Boot 4.1 / Spring AI 2.0 / Embabel 1.5（见 tasks/todo.md）
+# 敏感项一律走环境变量，禁止提交明文密钥。
+# ============================================================================
+
+spring:
+  application:
+    name: enterprise-ai-agent
+  threads:
+    virtual:
+      enabled: true   # Java 21 虚拟线程：LLM 调用为长阻塞 IO，收益明显
+
+  # ---------------- MySQL ----------------
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:enterprise_agent}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 5000
+
+  jpa:
+    hibernate:
+      ddl-auto: none          # 生产环境表结构由 Flyway/DBA 管理（Phase 5 引入 schema）
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  # ---------------- Elasticsearch（Spring AI ES VectorStore 经 Boot 原生客户端连接） ----------------
+  elasticsearch:
+    uris: ${ES_URIS:http://localhost:9200}
+    connection-timeout: 5s
+    socket-timeout: 30s
+
+  # ---------------- Redis ----------------
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3s
+
+# ============================================================================
+# Spring AI 2.0（OpenAI 兼容端点）
+# 提供：ChatModel（对话）、EmbeddingModel（RAG 向量化）
+# ============================================================================
+  ai:
+    openai:
+      api-key: ${LLM_API_KEY:}
+      base-url: ${LLM_BASE_URL:https://api.openai.com}
+      chat:
+        options:
+          model: ${LLM_CHAT_MODEL:gpt-4o-mini}
+          temperature: 0.2          # 结构化提取任务需要低温度
+      embedding:
+        options:
+          model: ${LLM_EMBEDDING_MODEL:text-embedding-3-small}
+    vectorstore:
+      elasticsearch:              # 属性名核实自 spring-ai-autoconfigure-vector-store-elasticsearch-2.0.0
+        initialize-schema: true   #   首次启动自动创建索引；连接走 spring.elasticsearch.uris
+        index-name: enterprise-knowledge
+        dimensions: 1024          # 须与 LLM_EMBEDDING_MODEL 实际输出维度一致
+                                 #   （Kimi 网关对 text-embedding-3-small 请求实测返回 1024 维，
+                                 #     官方 OpenAI 为 1536 维——切换网关须同步改此值并删索引重建）
+
+# ============================================================================
+# Embabel 1.5（Agent Platform + OpenAI 模型接入）
+# 属性名核实自 embabel-agent-openai-autoconfigure-1.5.0 的
+# spring-configuration-metadata.json
+# ============================================================================
+embabel:
+  agent:
+    platform:
+      # SIMPLE（默认）：Action 在调用线程执行，TenantContext 全程有效；
+      # 若切 CONCURRENT，TenantContextAgentProcessCallback 会按官方钩子传播租户上下文
+      process-type: SIMPLE
+      models:
+        openai:
+          api-key: ${LLM_API_KEY:}
+          # Embabel 走官方 openai-java SDK：URL = baseUrl + "chat/completions"（固定路径，
+          # jar 内日志原文 "openai-java SDK uses fixed endpoint paths. Bake the path into baseUrl"），
+          # 故此处必须带 /v1；与 Spring AI 通道（base-url + /v1/embeddings 拼法）不同源，勿合并
+          base-url: ${LLM_BASE_URL:https://api.openai.com}/v1
+
+# ============================================================================
+# 可观测性：Actuator + Prometheus + Tracing（OTel bridge 于 Phase 9 接入）
+# ============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+# ============================================================================
+# 工具权限门控：未列出的工具一律 DENY（新增工具必须显式授权）
+# 用户权限点在 Phase 9 鉴权过滤器中注入 UserContext
+# ============================================================================
+agent:
+  tools:
+    permission:
+      default-policy: DENY
+      tool-permissions:
+        queryEnterprises: enterprise:query
+        queryAlarms: alarm:query
+        computeStatistics: statistics:query
+        searchKnowledge: knowledge:search
+  # Prompt 灰度：key 为 {category}/{name}，value 为生效版本。
+  # 灰度 = 新增 vN .st 文件 + 此处指向 N；回滚 = 删除该行。
+  prompts:
+    active-versions: {}
+    #   intent/intent-recognition: 2
+
+logging:
+  # traceId/spanId 进日志行，与 executionId（审计表）双键关联定位
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+  level:
+    com.enterpriseai: DEBUG
+    com.embabel: INFO
+    org.springframework.ai: INFO

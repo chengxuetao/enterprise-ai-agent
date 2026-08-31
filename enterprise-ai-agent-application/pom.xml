@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.enterpriseai</groupId>
+        <artifactId>enterprise-ai-agent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>enterprise-ai-agent-application</artifactId>
+    <name>Enterprise AI Agent :: Application</name>
+    <description>Bootstrap module: assembles all modules, hosts configuration and prompts, produces the executable jar.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.enterpriseai</groupId>
+            <artifactId>enterprise-ai-agent-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.enterpriseai</groupId>
+            <artifactId>enterprise-ai-agent-agent</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.enterpriseai</groupId>
+            <artifactId>enterprise-ai-agent-infrastructure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.enterpriseai</groupId>
+            <artifactId>enterprise-ai-agent-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.enterpriseai</groupId>
+            <artifactId>enterprise-ai-agent-domain</artifactId>
+        </dependency>
+
+        <!-- Embabel OpenAI 接入（OpenAI 兼容端点：DeepSeek/Qwen/本地 vLLM 等可经 base-url 覆盖） -->
+        <dependency>
+            <groupId>com.embabel.agent</groupId>
+            <artifactId>embabel-agent-starter-openai</artifactId>
+            <version>${embabel.version}</version>
+        </dependency>
+        <!-- Spring AI OpenAI：提供 EmbeddingModel（RAG 向量化）与标准 ChatModel -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+        <!-- Boot 4 原生 ES 客户端：为 Spring AI ES VectorStore 提供 Rest5Client bean，
+             连接配置读取 spring.elasticsearch.* -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-elasticsearch</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!-- 分布式追踪：Boot 4.1 BOM 原生管理（io.opentelemetry:opentelemetry-bom@1.62.0），
+             Micrometer Tracing 桥接 OTel，OTLP 上报端点见 management.otlp.tracing.endpoint -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-opentelemetry</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
+        </dependency>
+
+        <!-- tests -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.agent</groupId>
+            <artifactId>embabel-agent-test</artifactId>
+            <version>${embabel.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.enterpriseai.application.EnterpriseAiAgentApplication</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业智能助手 · Enterprise AI Agent</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --panel: #ffffff; --border: #e2e8f0;
+    --text: #1a2332; --muted: #64748b;
+    --primary: #2563eb; --primary-weak: #dbeafe;
+    --ok: #16a34a; --warn: #d97706; --err: #dc2626;
+    --bubble-user: #2563eb; --bubble-user-text: #ffffff;
+    --bubble-ai: #ffffff;
+    --code-bg: #eef2f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f141a; --panel: #171e28; --border: #2a3441;
+      --text: #e2e8f0; --muted: #8b98a9;
+      --primary: #3b82f6; --primary-weak: #1e3a5f;
+      --bubble-ai: #1c2530; --code-bg: #0c1117;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.6 "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+    flex: none;
+  }
+  header .logo {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--primary), #7c3aed);
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  #health { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  #health .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  #health.up .dot { background: var(--ok); }
+  #health.down .dot { background: var(--err); }
+
+  main { flex: 1; display: flex; min-height: 0; }
+
+  aside {
+    width: 260px; flex: none; background: var(--panel); border-right: 1px solid var(--border);
+    padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+  }
+  aside h2 { font-size: 12px; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  aside label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  aside select, aside input[type=text] {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text); font-size: 13px;
+  }
+  .perm { display: flex; align-items: center; gap: 7px; font-size: 13px; padding: 2px 0; cursor: pointer; }
+  .perm code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .session-box { display: flex; gap: 6px; align-items: center; }
+  .session-box input { flex: 1; }
+  button {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: var(--primary); }
+  button.primary { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  aside .note { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 78%; display: flex; flex-direction: column; gap: 4px; }
+  .msg.user { align-self: flex-end; }
+  .msg.ai { align-self: flex-start; }
+  .bubble {
+    padding: 10px 14px; border-radius: 12px; white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.user .bubble { background: var(--bubble-user); color: var(--bubble-user-text); border-bottom-right-radius: 4px; }
+  .msg.ai .bubble { background: var(--bubble-ai); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .msg.error .bubble { background: transparent; border: 1px solid var(--err); color: var(--err); border-radius: 12px; }
+  .bubble code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .bubble strong { font-weight: 700; }
+  .meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .meta .eid { font-family: ui-monospace, Consolas, monospace; }
+  .badge {
+    padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: var(--primary-weak); color: var(--primary);
+  }
+  .badge.err { background: rgba(220,38,38,.12); color: var(--err); }
+
+  #pending { align-self: flex-start; color: var(--muted); font-size: 13px; padding: 4px 14px; display: none; }
+  #pending .dots::after { content: ""; animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+  #examples { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 10px; }
+  #examples button { font-size: 12px; padding: 5px 10px; border-radius: 999px; }
+
+  #composer {
+    flex: none; display: flex; gap: 10px; padding: 14px 20px 18px;
+    background: var(--panel); border-top: 1px solid var(--border);
+  }
+  #composer textarea {
+    flex: 1; resize: none; height: 46px; max-height: 140px; padding: 12px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+    color: var(--text); font: inherit;
+  }
+  #composer textarea:focus { outline: 2px solid var(--primary-weak); border-color: var(--primary); }
+
+  @media (max-width: 760px) {
+    main { flex-direction: column; }
+    aside { width: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .msg { max-width: 94%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">E</div>
+  <div>
+    <h1>企业智能助手</h1>
+    <div class="sub">企业查询 · 告警查询 · 数据统计 · 知识库问答</div>
+  </div>
+  <div id="health"><span class="dot"></span><span id="health-text">检测中</span></div>
+</header>
+
+<main>
+  <aside>
+    <div>
+      <h2>身份与租户</h2>
+      <p class="note" style="margin:6px 0 10px">
+        本页为本地演示：信任头由浏览器直接携带。<br>
+        生产环境由 API 网关鉴权后注入，页面无此面板。
+      </p>
+      <label for="tenant">租户</label>
+      <select id="tenant">
+        <option value="tenant-a">tenant-a（演示租户 A）</option>
+        <option value="tenant-b">tenant-b（演示租户 B）</option>
+      </select>
+      <label for="user" style="margin-top:10px">用户 ID</label>
+      <input type="text" id="user" value="demo-user">
+    </div>
+
+    <div>
+      <h2>权限点</h2>
+      <label class="perm"><input type="checkbox" value="enterprise:query" checked><code>enterprise:query</code></label>
+      <label class="perm"><input type="checkbox" value="alarm:query" checked><code>alarm:query</code></label>
+      <label class="perm"><input type="checkbox" value="statistics:query" checked><code>statistics:query</code></label>
+      <label class="perm"><input type="checkbox" value="knowledge:search" checked><code>knowledge:search</code></label>
+      <label class="perm"><input type="checkbox" value="knowledge:restricted"><code>knowledge:restricted</code></label>
+      <p class="note">勾选决定后端可见的工具与知识范围（在后端强制过滤，与提示词无关）。</p>
+    </div>
+
+    <div>
+      <h2>会话</h2>
+      <div class="session-box" style="margin-top:8px">
+        <input type="text" id="session" readonly>
+        <button id="new-session" title="开启新会话">新会话</button>
+      </div>
+      <p class="note">executionId 是每次执行的追踪键，可在审计表 / 日志 / 指标中关联查询。</p>
+    </div>
+  </aside>
+
+  <section id="chat">
+    <div id="messages">
+      <div class="msg ai">
+        <div class="bubble">您好，我是企业智能助手。可以帮您：
+
+- **查企业**：如「查一下北京的软件企业」
+- **查告警**：如「最近 7 天有哪些严重告警」
+- **做统计**：如「统计各企业的告警数量」
+- **问知识库**：如「知识库支持哪些文档类型」
+
+切换左侧租户可体验多租户数据隔离。</div>
+      </div>
+    </div>
+    <div id="pending"><span class="dots">正在思考</span> <span id="pending-sec"></span></div>
+    <div id="examples">
+      <button data-q="查一下北京的软件企业">🏢 查企业</button>
+      <button data-q="最近7天有哪些严重告警">🔔 查告警</button>
+      <button data-q="统计各企业的告警数量，取前5">📊 数据统计</button>
+      <button data-q="知识库问答：系统的权限模型是怎样的">📚 知识库问答</button>
+    </div>
+    <div id="composer">
+      <textarea id="input" placeholder="输入问题，Ctrl+Enter 发送" maxlength="4000"></textarea>
+      <button class="primary" id="send">发送</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const messages = $("messages"), input = $("input"), sendBtn = $("send");
+  const pendingBox = $("pending"), pendingSec = $("pending-sec");
+
+  let sessionId = newSessionId();
+  $("session").value = sessionId;
+  $("new-session").addEventListener("click", () => {
+    sessionId = newSessionId();
+    $("session").value = sessionId;
+  });
+  function newSessionId() {
+    return (crypto.randomUUID ? crypto.randomUUID() :
+      "s-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10));
+  }
+
+  /* ---------- 健康状态（/actuator 非鉴权路径） ---------- */
+  (async function health() {
+    const el = $("health");
+    try {
+      const r = await fetch("/actuator/health");
+      el.classList.add(r.ok ? "up" : "down");
+      $("health-text").textContent = r.ok ? "服务正常" : "服务异常";
+    } catch {
+      el.classList.add("down");
+      $("health-text").textContent = "服务不可达";
+    }
+  })();
+
+  /* ---------- 权限与身份（本地演示的信任头来源） ---------- */
+  function trustedHeaders() {
+    const perms = [...document.querySelectorAll(".perm input:checked")]
+      .map((c) => c.value).join(",");
+    return {
+      "Content-Type": "application/json",
+      "X-User-Id": $("user").value.trim() || "demo-user",
+      "X-Tenant-Id": $("tenant").value,
+      "X-Permissions": perms,
+    };
+  }
+
+  /* ---------- 极简 Markdown：转义后仅加粗 / 行内代码 ---------- */
+  function render(text) {
+    let s = String(text ?? "").replace(/[&<>"]/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+    return s;
+  }
+
+  function addUser(text) {
+    const div = document.createElement("div");
+    div.className = "msg user";
+    div.innerHTML = '<div class="bubble"></div>';
+    div.firstChild.textContent = text;
+    messages.appendChild(div);
+    scrollBottom();
+  }
+
+  function addAi(answer, meta) {
+    const div = document.createElement("div");
+    div.className = "msg ai";
+    div.innerHTML =
+      '<div class="bubble"></div>' +
+      '<div class="meta"></div>';
+    div.querySelector(".bubble").innerHTML = render(answer);
+    if (meta) div.querySelector(".meta").innerHTML = meta;
+    messages.appendChild(div);
+    scrollBottom();
+  }
+
+  function addError(body) {
+    const div = document.createElement("div");
+    div.className = "msg error";
+    div.innerHTML = '<div class="bubble"></div>';
+    const b = div.querySelector(".bubble");
+    b.innerHTML = "⚠ " + render(body.userMessage || "请求失败") +
+      (body.code ? ` <code>${body.code}</code>` : "");
+    if (body.executionId) {
+      const m = document.createElement("div");
+      m.className = "meta";
+      m.innerHTML = `<span class="eid">${body.executionId}</span>` +
+        (body.retryable ? " · 可重试" : "");
+      div.appendChild(m);
+    }
+    messages.appendChild(div);
+    scrollBottom();
+  }
+
+  const intentLabel = {
+    ENTERPRISE_QUERY: "企业查询", ALARM_QUERY: "告警查询",
+    STATISTICS_QUERY: "数据统计", KNOWLEDGE_QA: "知识问答", UNKNOWN: "未识别",
+  };
+  function metaOf(r, ms) {
+    const intent = r.intent ? (intentLabel[r.intent] || r.intent) : "—";
+    return `<span class="badge">${intent}</span>` +
+      `<span class="eid">${r.executionId || ""}</span>` +
+      `<span>${(ms / 1000).toFixed(1)}s</span>`;
+  }
+
+  function scrollBottom() { messages.scrollTop = messages.scrollHeight; }
+
+  /* ---------- 发送 ---------- */
+  let busy = false, timer = null;
+  async function send() {
+    const text = input.value.trim();
+    if (!text || busy) return;
+    busy = true;
+    sendBtn.disabled = true;
+    input.value = "";
+    addUser(text);
+
+    const t0 = performance.now();
+    pendingBox.style.display = "block";
+    timer = setInterval(() => {
+      pendingSec.textContent = ((performance.now() - t0) / 1000).toFixed(0) + "s";
+    }, 500);
+
+    try {
+      const resp = await fetch("/api/agent/chat", {
+        method: "POST",
+        headers: trustedHeaders(),
+        body: JSON.stringify({ message: text, sessionId }),
+      });
+      const body = await resp.json().catch(() => ({}));
+      if (resp.ok && body.status === "SUCCEEDED") {
+        addAi(body.answer, metaOf(body, performance.now() - t0));
+      } else {
+        addError(body.code ? body : { userMessage: `HTTP ${resp.status}` });
+      }
+    } catch (e) {
+      addError({ userMessage: "网络错误：" + e.message });
+    } finally {
+      clearInterval(timer);
+      pendingBox.style.display = "none";
+      pendingSec.textContent = "";
+      busy = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  sendBtn.addEventListener("click", send);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); }
+  });
+  document.querySelectorAll("#examples button").forEach((b) =>
+    b.addEventListener("click", () => { input.value = b.dataset.q; input.focus(); }));
+})();
+</script>
+</body>
+</html>

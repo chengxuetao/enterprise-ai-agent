@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.enterpriseai</groupId>
+    <artifactId>enterprise-ai-agent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>Enterprise AI Agent</name>
+    <description>Enterprise AI Agent system built on Spring Boot 4.1 / Spring AI 2.0 / Embabel 1.5</description>
+
+    <modules>
+        <module>enterprise-ai-agent-domain</module>
+        <module>enterprise-ai-agent-core</module>
+        <module>enterprise-ai-agent-infrastructure</module>
+        <module>enterprise-ai-agent-tool</module>
+        <module>enterprise-ai-agent-rag</module>
+        <module>enterprise-ai-agent-agent</module>
+        <module>enterprise-ai-agent-api</module>
+        <module>enterprise-ai-agent-application</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- 版本基线已核实于 Maven Central（见 tasks/todo.md）：Embabel 1.5.0 构建于 Spring AI 2.0.0 + Boot 4.1.0 之上 -->
+        <spring-ai.version>2.0.0</spring-ai.version>
+        <embabel.version>1.5.0</embabel.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- internal modules -->
+            <dependency>
+                <groupId>com.enterpriseai</groupId>
+                <artifactId>enterprise-ai-agent-domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.enterpriseai</groupId>
+                <artifactId>enterprise-ai-agent-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.enterpriseai</groupId>
+                <artifactId>enterprise-ai-agent-infrastructure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.enterpriseai</groupId>
+                <artifactId>enterprise-ai-agent-tool</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.enterpriseai</groupId>
+                <artifactId>enterprise-ai-agent-rag</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.enterpriseai</groupId>
+                <artifactId>enterprise-ai-agent-agent</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.enterpriseai</groupId>
+                <artifactId>enterprise-ai-agent-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
