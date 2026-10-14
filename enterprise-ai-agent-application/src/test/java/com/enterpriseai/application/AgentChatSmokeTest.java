@@ -67,7 +67,7 @@ class AgentChatSmokeTest {
         AgentPlatform platform = IntegrationTestUtils.dummyAgentPlatform(llmOperations);
         EnterpriseAssistantAgent agent = new EnterpriseAssistantAgent(
                 enterpriseService, alarmService, statisticsService, knowledgeSearchService,
-                new PromptRegistry(new PromptVersionProperties(Map.of())));
+                conversationStore, new PromptRegistry(new PromptVersionProperties(Map.of())));
         AgentMetadataReader reader = new AgentMetadataReader();
         AgentScope scope = reader.createAgentMetadata(agent);
         platform.deploy((Agent) scope);

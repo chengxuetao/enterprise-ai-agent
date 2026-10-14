@@ -67,9 +67,8 @@ spring:
                                  #     官方 OpenAI 为 1536 维——切换网关须同步改此值并删索引重建）
 
 # ============================================================================
-# Embabel 1.5（Agent Platform + OpenAI 模型接入）
-# 属性名核实自 embabel-agent-openai-autoconfigure-1.5.0 的
-# spring-configuration-metadata.json
+# Embabel 1.5.3（Agent Platform + OpenAI 模型接入）
+# 属性名核实自 embabel-agent-openai-autoconfigure-1.5.3 sources jar
 # ============================================================================
 embabel:
   agent:
@@ -84,6 +83,16 @@ embabel:
           # jar 内日志原文 "openai-java SDK uses fixed endpoint paths. Bake the path into baseUrl"），
           # 故此处必须带 /v1；与 Spring AI 通道（base-url + /v1/embeddings 拼法）不同源，勿合并
           base-url: ${LLM_BASE_URL:https://api.openai.com}/v1
+          # --- 重试与超时（交互场景调优，Phase 13） ---
+          # 默认 max-attempts=10 × 退避 5s×5^n 最长约 3 分钟才报错，交互不可接受；
+          # 3 次 × 2s 起步 ×2 倍退避 ≈ 10s 内收敛（429/5xx/网络抖动仍可重试）
+          max-attempts: 3
+          backoff-millis: 2000
+          backoff-multiplier: 2.0
+          # 1.5.3 新增（OpenAiCompatibleClientProperties）：读超时覆盖整次调用
+          # （发送至读完最后一个字节）。须容纳推理模型单次 ~117s 的实测耗时，取 180s
+          connect-timeout: 10s
+          read-timeout: 180s
 
 # ============================================================================
 # 可观测性：Actuator + Prometheus + Tracing（OTel bridge 于 Phase 9 接入）

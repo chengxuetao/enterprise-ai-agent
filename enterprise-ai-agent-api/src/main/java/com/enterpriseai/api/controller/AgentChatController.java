@@ -94,10 +94,13 @@ public class AgentChatController {
             context.markFailed(e.getMessage());
             throw e;
         } catch (Exception e) {
+            // 原样上抛，交 GlobalExceptionHandler 统一分类（cause 链探测 LLM 失败签名
+            // → LLM_ERROR；其余 → BUSINESS_ERROR）。此前在此包装为 BUSINESS_ERROR，
+            // 而 AgentInvocation.invoke 经 CompletableFuture.get() 上抛的失败均为
+            // ExecutionException 包装——LLM 故障因此被误报为业务错误（§14.3-a 病根）。
             context.markFailed(e.getMessage());
             log.error("Agent 执行异常 executionId={}", context.executionId(), e);
-            throw new AgentException(AgentErrorCode.BUSINESS_ERROR,
-                    "Agent 执行过程中发生未预期错误", e);
+            throw e;
         } finally {
             recorder.onExecutionEnd(context);
             AgentExecutionContext.clear();

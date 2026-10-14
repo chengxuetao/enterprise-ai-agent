@@ -1,6 +1,6 @@
 # 企业级 AI Agent 系统（Enterprise AI Agent）
 
-> 基于 **Spring Boot 4.1 / Spring AI 2.0 / Embabel 1.5** 构建的企业级智能助手参考实现。
+> 基于 **Spring Boot 4.1 / Spring AI 2.0.1 / Embabel 1.5.3** 构建的企业级智能助手参考实现。
 > 一个 Java 21 + Maven 多模块工程，把"LLM 编排框架（Embabel GOAP）+ 结构化输出 + 多租户 + 工具权限 + RAG + 全链路可观测"按生产标准整合在一起。
 
 ---
@@ -50,9 +50,9 @@
 - **可观测性**：Micrometer 指标（Prometheus）+ OpenTelemetry Tracing（OTLP）+ traceId/spanId 注入日志行。
 - **LLM 供应商无关**：OpenAI 兼容端点均可接入（实测 Kimi For Coding 网关；DeepSeek/Qwen/vLLM 可覆写配置接入）。
 
-### 1.3 交付状态（2026-08-28 实证）
+### 1.3 交付状态（2026-10-13 实证）
 
-- ✅ 26 个测试全绿（单测 21 + Agent 集成 2 + HTTP 冒烟 3），`mvn test` BUILD SUCCESS
+- ✅ 53 个测试全绿（Phase 13：升级 Spring AI 2.0.1 / Embabel 1.5.3 + 多轮对话 + 错误分类修复 + 审计补线；基线 31 个复核修正），`mvn test` BUILD SUCCESS
 - ✅ 真实 LLM 端到端联调 SUCCEEDED（意图识别→参数提取→权限过滤→DB 查询→分析→应答全链路，117s，推理模型多轮 Action 各一次 LLM 调用）
 - ✅ 审计落库、租户隔离（tenant-b 只见自己 2 家企业，tenant-a 的 8 家完全不可见）实证通过
 - ✅ Web 聊天界面（单文件 `index.html`，随 Boot jar 托管在 `/`）
@@ -61,21 +61,21 @@
 
 ## 2. 技术栈与版本基线
 
-### 2.1 版本矩阵（2026-08-28 逐项从 Maven Central POM / sources jar 核实）
+### 2.1 版本矩阵（2026-10-13 逐项从 Maven Central POM / sources jar 核实）
 
 | 组件 | 版本 | 说明 |
 |---|---|---|
 | Java | **21（LTS）** | 启用虚拟线程（`spring.threads.virtual.enabled=true`），适配 LLM 长阻塞 IO |
-| Spring Boot | **4.1.1** | Embabel 1.5.0 构建于 Boot 4.1.0 之上；Boot 4 有多处破坏性变更（见 §14） |
-| Spring AI | **2.0.0**（spring-ai-bom） | 提供 EmbeddingModel、ChatClient、ES VectorStore、`@Tool` 注解 |
-| Embabel | **1.5.0**（`com.embabel.agent:embabel-agent-starter`） | Agent 编排框架：`@Agent`/`@Action`/`@Condition`/`@AchievesGoal` + GOAP 规划器 |
+| Spring Boot | **4.1.1** | Maven Central 最新 GA；Boot 4 有多处破坏性变更（见 §14） |
+| Spring AI | **2.0.1**（spring-ai-bom） | 提供 EmbeddingModel、ChatClient、ES VectorStore、`@Tool` 注解；2.0.1 升级说明中的破坏性变更（Redis 记忆模块重命名/Mistral/MCP）均不涉及本项目 |
+| Embabel | **1.5.3**（`com.embabel.agent:embabel-agent-starter`） | Agent 编排框架：`@Agent`/`@Action`/`@Condition`/`@AchievesGoal` + GOAP 规划器；构建于 Spring AI 2.0.1 + Boot 4.1.1 之上 |
 | 数据库 | MySQL 8.4 | 业务数据 + 审计落库，JPA（Hibernate），schema 手动 SQL 管理 |
 | 缓存/记忆 | Redis 7 | 会话短期记忆（TTL 7 天） |
 | 向量库 | Elasticsearch 9.1.0 | Spring AI 2.0 的 rest5 客户端（elasticsearch-java 9.x）**要求 ES 9.x 服务端** |
 | 可观测 | Micrometer + micrometer-tracing（OTel 桥） | Boot 4.1 BOM 原生管理 otel-bom@1.62.0 |
 | 构建 | Maven 多模块（8 模块） | 无循环依赖，`enterprise-ai-agent-application` 为可执行聚合模块 |
 
-> ⚠️ **版本核实说明**：Embabel 的 GitHub README / java-agent-template 长期停留在 0.3.x + Boot 3.5，与 Maven Central 实际发布严重脱节。本项目所有 Embabel API 用法均从 `embabel-agent-api-1.5.0-sources.jar` 源码核实，**以 Maven Central 为准，勿信官方 README**。
+> ⚠️ **版本核实说明**：Embabel 的 GitHub README / java-agent-template 长期停留在 0.3.x + Boot 3.5，与 Maven Central 实际发布严重脱节。本项目所有 Embabel API 用法均从 `embabel-agent-api-1.5.3-sources.jar` 源码核实（1.5.0→1.5.3 逐文件 diff 证实 API 只增不删），**以 Maven Central 为准，勿信官方 README**。
 
 ### 2.2 模块依赖关系
 
@@ -139,7 +139,7 @@
 │  │    └─ finally：审计收尾 + ThreadLocal 清理                                              │  │  │
 │  │                                                                                          │  │  │
 │  │  ┌─────────────────── agent 模块：EnterpriseAssistantAgent（Embabel GOAP）──────────┐   │  │  │
-│  │  │  @Action × 16 + @Condition × 5 + @AchievesGoal × 2                                │   │  │  │
+│  │  │  @Action × 17 + @Condition × 5 + @AchievesGoal × 2                                │   │  │  │
 │  │  │  意图识别(LLM) → 意图路由(纯Java) → 参数提取(LLM) → 业务查询(纯Java)                │   │  │  │
 │  │  │  → 结果归一化(纯Java) → 数据分析(LLM) → 最终应答(LLM) / 未知兜底(LLM)               │   │  │  │
 │  │  └──────┬───────────────────────────────────────────────────────────────────┬───────┘   │  │  │
@@ -188,7 +188,8 @@ Embabel AgentPlatform（GOAP 规划器）
   │ 读取 @Agent 元数据 → AStarGoapPlanner 规划 → 在 embabel-virtual 虚拟线程逐个执行 Action
   │ （黑板 blackboard：强类型对象在 Action 之间按类型匹配自动传递）
   ▼
-EnterpriseAssistantAgent 的 16 个 @Action（见 §6）
+EnterpriseAssistantAgent 的 17 个 @Action（见 §6；首个为纯 Java 的历史加载
+  loadConversationHistory：读 Redis 会话记忆 → ConversationHistory 注入意图/提取 Prompt）
   │ LLM 节点：ai.withDefaultLlm().createObject(prompt, X.class)  ← 结构化输出
   │ Java 节点：领域服务查询 / 归一化转换
   ▼
@@ -213,7 +214,7 @@ AgentResponse {answer(Markdown), intent}
 
 2. **权限控制只做在 Java 后端。** 按用户权限点过滤可暴露给 LLM 的工具集；未授权工具**不注册**（让 LLM 看不见），而非注册后靠 Prompt 提示拒绝——Prompt 约束永远不是安全边界。
 
-3. **一个 Action 只做一件事。** 16 个单一职责 `@Action`，由 GOAP Planner 按类型数据流自动串联；查询类 Action 是纯 Java（无 LLM），LLM 只出现在 4 类认知节点（意图识别、参数提取、数据分析、最终应答）。
+3. **一个 Action 只做一件事。** 17 个单一职责 `@Action`，由 GOAP Planner 按类型数据流自动串联；历史加载/查询/归一化 Action 是纯 Java（无 LLM），LLM 只出现在 4 类认知节点（意图识别、参数提取、数据分析、最终应答）。
 
 4. **一个 Prompt 只做一个认知任务。** intent / parameter / analysis / response 四层分离，各自独立 `.st` 文件 + 版本号，禁止"万能 Prompt"。
 
@@ -258,6 +259,7 @@ AgentResponse {answer(Markdown), intent}
 | `AnalysisData(intent, dataPresent, totalRecords, truncated, sourceDescription, rows)` | 归一化分析输入 | 四条业务分支统一转换为此类型；行数已在转换时截断（保护上下文窗口）；内嵌 `DataRow(label, details)` |
 | `AnalysisResult(summary, findings, risks, recommendations)` | 数据分析 LLM 输出 | **结论只能来自 AnalysisData，禁止编造**；null List 归一为空 |
 | `AgentResponse(answer, intent)` | Agent 最终输出（Goal 类型） | answer 为中文 Markdown；`@AchievesGoal` 挂在产出此类型的 Action 上 |
+| `ConversationHistory(messages)` | 多轮上下文（黑板数据流类型） | 内嵌 `ConversationMessage(role, content)`；`transcript()` 渲染为 Prompt 注入文本（"用户：…/助手：…"，单条截断 300 字）；非 LLM 输出类型，由纯 Java Action 从会话记忆加载 |
 
 #### 5.1.3 领域服务接口（单方法接口 + 租户隔离契约）
 
@@ -293,7 +295,7 @@ record：`userId, tenantId, username, roles(Set), permissions(Set)`；`hasPermis
 
 字段：`executionId`（UUID，**日志/审计/指标/Trace 的统一关联键**）、`sessionId`、`user`、`request`、`startTime`、`currentIntent`（识别后回填）、`currentAction`、`actionResults`/`toolResults`（LinkedHashMap）、`status`（RUNNING→SUCCEEDED/FAILED）、`errorMessage`。
 
-- 工厂：`AgentExecutionContext.begin(user, request)`（绑定当前线程普通 ThreadLocal）
+- 工厂：`AgentExecutionContext.begin(user, request)`（绑定当前线程 **InheritableThreadLocal**——Phase 13 与 TenantContext 统一选型，理由同上：Action 线程需读取 executionId/sessionId，历史加载 Action 与审计事件监听器均依赖此行为）
 - 状态推进：`setCurrentIntent` / `setCurrentAction` / `recordActionResult` / `recordToolResult` / `markSucceeded` / `markFailed`
 - `current()` / `clear()` 存取清理
 
@@ -347,7 +349,7 @@ record：`userId, tenantId, username, roles(Set), permissions(Set)`；`hasPermis
 基于 `StringRedisTemplate` 的 **Redis List**：
 
 - Key：`conv:{tenantId}:{sessionId}`（租户隔离在 key 层面成立）
-- 元素：纯字符串 `role|content`（如 `user|你好`），无 JSON 序列化开销
+- 元素：纯字符串 `role|content`（如 `user|你好`），无 JSON 序列化开销；**该编码是 Redis 实现私有细节**——`recentMessages` 返回类型化的 `List<ConversationHistory.ConversationMessage>`（core 契约不暴露存储格式，首次 `|` 分割，内容中的 `|` 不受影响，畸形行跳过并 WARN）
 - 写入：`rightPush` 追加 → `expire` 刷新 **7 天滑动 TTL** → `size` 超过 **100 条**则 `trim(-100, -1)` 只保留最近 100 条（防长会话无界增长）
 - 单条内容截断 **2000 字符**（null 置空串）
 - 读取：`range(key, -limit, -1)` 取尾部 limit 条，时间正序；limit ≤ 0 返回空列表
@@ -465,7 +467,7 @@ tenantId == '<sanitize(tenantId)>'
 
 ### 5.6 enterprise-ai-agent-agent —— Agent 编排（Embabel）
 
-单一类 `EnterpriseAssistantAgent`（详见 §6），依赖 4 个领域服务 + `PromptRegistry`，**无实例可变状态，Spring 单例线程安全**。
+单一类 `EnterpriseAssistantAgent`（详见 §6），依赖 4 个领域服务 + `ConversationStore` + `PromptRegistry`，**无实例可变状态，Spring 单例线程安全**。
 
 ### 5.7 enterprise-ai-agent-api —— REST 接入层
 
@@ -500,9 +502,12 @@ tenantId == '<sanitize(tenantId)>'
 | 异常 | HTTP | code | retryable |
 |---|---|---|---|
 | `AgentException` | PERMISSION_DENIED→403、VALIDATION_ERROR→400、其余→500 | `e.getCode().name()` | `e.isRetryable()` |
-| Embabel `ActionException` | 500 | `TOOL_ERROR` | `instanceof ActionException.Transient`（官方可重试语义） |
+| Embabel `ActionException` | 500 | cause 链命中 LLM 签名→`LLM_ERROR`；否则 `TOOL_ERROR` | LLM 签名：`TransientAiException`→true 其余 false；无签名时 `instanceof ActionException.Transient` |
 | `MethodArgumentNotValidException` | 400 | `VALIDATION_ERROR` | false（字段错误详情仅进日志） |
-| `Exception` 兜底 | 500 | `BUSINESS_ERROR` | false |
+| `HttpMessageNotReadableException` | 400 | `VALIDATION_ERROR` | false（请求体缺失/JSON 畸形，Phase 13 修复） |
+| `Exception` 兜底 | 500 | cause 链命中 LLM 签名→`LLM_ERROR`；否则 `BUSINESS_ERROR` | 仅 `TransientAiException` 签名→true |
+
+> **LLM 失败签名**（Phase 13，§14.3-a 修复）：沿 cause 链探测 `org.springframework.ai.retry.TransientAiException` / `NonTransientAiException`（Spring AI HTTP 层）与 `com.openai.*`（openai-java SDK，包前缀匹配）——`AgentInvocation.invoke` 经 `CompletableFuture.get()` 上抛的失败均为 `ExecutionException` 包装，签名在链上而非顶层异常。
 
 executionId 优先取请求属性，回退 `AgentExecutionContext.current()`。
 
@@ -513,10 +518,11 @@ executionId 优先取请求属性，回退 `AgentExecutionContext.current()`。
   - `@ConfigurationPropertiesScan(basePackages = "com.enterpriseai")` —— 注册 `agent.tools.permission.*` 与 `agent.prompts.*`
   - `@EnableJpaRepositories(basePackages = "com.enterpriseai.infra.persistence.repository")` —— JPA 仓库扫描与组件扫描相互独立
   - `@EntityScan(basePackages = "com.enterpriseai.infra.persistence.entity")` —— Boot 4 中该注解已迁包至 `org.springframework.boot.persistence.autoconfigure`
-- 三个配置类：
+- 四个配置类：
   - `MetricsAgentExecutionRecorder`（`@Primary`）：装饰 `MySqlAgentExecutionRecorder`，叠加 Micrometer 指标（详见 §10.2）
   - `SpringAiConfig`：仅装配 `ChatClient`；`ChatModel`/`EmbeddingModel` 由 `spring-ai-starter-model-openai` 自动配置
   - `TenantContextAgentProcessCallback`：实现 Embabel `AgentProcessCallback`，无实例态设计（快照存 `ConcurrentHashMap<AgentProcess, UserContext>`，完成即移除防泄漏）——把请求线程的租户上下文传播到 Action 线程；由于 TenantContext 已是 InheritableThreadLocal，SIMPLE/CONCURRENT 下均非必需，仅当未来把 Action 调度到非派生线程时按官方钩子补齐
+  - `AgentAuditEventListener`（Phase 13 补线）：实现 Embabel `AgenticEventListener` SPI（容器内全部实现 Bean 被平台 `eventListener(listeners)` 自动组播），把 `ActionExecutionResultEvent` 翻译为 `recorder.onActionComplete(...)`——此前该方法无生产调用方，`agent_action_execution` 明细与 `agent.action` Timer 实际从未触发；executionId 取自 `AgentExecutionContext.current()`（依赖 InheritableThreadLocal），审计失败只 WARN 不影响主流程
 
 ---
 
@@ -531,12 +537,18 @@ Embabel 默认规划器（`AStarGoapPlanner`）。核心机制：
 - **Goal（`@AchievesGoal`）**：产出 `AgentResponse` 即达成目标；本项目两个收尾 Action 共享同一 Goal，由条件决定走哪条路径。
 - **⚠️ GOAP 规划器铁律**（Phase 10 集成测试抓出的真实架构级 bug）：`@Action(pre={"命名条件"})` 中的命名条件**必须被某个 Action 在 `post={...}` 中声明**，否则 `isGoalReachable` 可达性检查判死 → 规划返回 null → `invoke()` 得 null。范式：产出分支判据的 Action（意图识别）在 `post` 中乐观声明全部可能条件，运行时按黑板实况重规划收敛到真实分支。
 
-### 6.2 六阶段认知流水线
+### 6.2 七阶段认知流水线
 
 ```
-UserInput("查询华东地区有哪些企业")
+UserInput("那深圳呢")        ← 追问示例（多轮场景）
   │
-  ▼ ①意图识别（LLM，单一认知任务：分类）
+  ▼ ⓪历史加载（纯 Java，Phase 13）：多轮上下文来源
+loadConversationHistory    ← TenantContext.get() + AgentExecutionContext.current().sessionId()
+  │                          → conversationStore.recentMessages(tenant, session, 10)
+  │                          → ConversationHistory（上下文缺失/存储异常降级为空历史）
+  ▼ ConversationHistory{[user: 帮我查北京的企业, assistant: 已找到…]}
+  │
+  ▼ ①意图识别（LLM，单一认知任务：分类；携带历史理解追问）
 recognizeIntent ── post={intentIsEnterpriseQuery, intentIsAlarmQuery,
   │                  intentIsStatisticsQuery, intentIsKnowledgeQa, intentIsUnknown}
   │           （GOAP 乐观后置声明：建立分支可达性，运行时按实况收敛）
@@ -544,11 +556,11 @@ recognizeIntent ── post={intentIsEnterpriseQuery, intentIsAlarmQuery,
   │
   ├── 5 个 @Condition（纯 Java）依据 intent 锁定唯一分支
   │
-  ▼ ②参数提取（LLM，按意图选分支；未提供的字段必须为 null）
+  ▼ ②参数提取（LLM，按意图选分支；未提供的字段必须为 null；历史供条件继承）
 extractEnterpriseQuery / extractAlarmQuery /      ← pre={intentIsXxxQuery}
 extractStatisticsQuery / extractKnowledgeQuery      （alarm/statistics 注入 current_time
   │                                                  供 LLM 换算相对时间）
-  ▼ EnterpriseQuery{city=null, ...}   ← 强类型 record（结构化输出）
+  ▼ EnterpriseQuery{city=深圳, ...}   ← 强类型 record（结构化输出，city 继承自上文话题）
   │
   ▼ ③业务查询（纯 Java：Service → Repository → DB，LLM 不参与）
 queryEnterprises / queryAlarms / computeStatistics / searchKnowledge
@@ -571,7 +583,7 @@ unknownIntentResponse（pre={intentIsUnknown}）─→ AgentResponse{UNKNOWN}
 
 要点：
 
-- **LLM 只出现在 4 类认知节点**：意图识别、参数提取、数据分析、最终应答；③④ 全是纯 Java，可单测、可审计、零 token。
+- **LLM 只出现在 4 类认知节点**：意图识别、参数提取、数据分析、最终应答；⓪③④ 全是纯 Java，可单测、可审计、零 token。
 - **`FinalAnswer` 是 Agent 内部 record**：LLM 仅产出 answer 文本，`intent` 由 Java 侧确定性回填，避免模型复读出错。
 - **上下文保护**：`MAX_ANALYSIS_ROWS = 20` 行截断 + 知识片段内容截断 500 字，保护上下文窗口与 token 成本；`total`/`truncated` 如实传递，分析 Prompt 据此在数据缺失时明确说"未查询到数据"。
 - **耗时参考**（Kimi kimi-k2-0905-preview 推理模型实测）：单请求 ~117s，4 次 LLM 调用（意图/提取/分析/应答）各一次；换非推理模型会显著更快。
@@ -675,10 +687,15 @@ unknownIntentResponse（pre={intentIsUnknown}）─→ AgentResponse{UNKNOWN}
 ```
 resources/prompts/
 ├── intent/      intent-recognition-v1.st        # UserInput → IntentResult（只分类，不回答）
+│                intent-recognition-v2.st        #  ← 生效（基线 v2，代码声明）：+{history} 多轮追问
 ├── parameter/   enterprise-query-v1.st          # 每类查询一个，question → 强类型 Query 对象
+│                enterprise-query-v2.st          #  ← 生效（基线 v2）：+{history} 条件继承
 │                alarm-query-v1.st               #   （相对时间换算注入 current_time）
+│                alarm-query-v2.st               #  ← 生效（基线 v2）：+{history}
 │                statistics-query-v1.st
+│                statistics-query-v2.st          #  ← 生效（基线 v2）：+{history}
 │                knowledge-query-v1.st           #   （检索问句改写，非原文照抄）
+│                knowledge-query-v2.st           #  ← 生效（基线 v2）：+{history} 结合上文改写
 ├── analysis/    data-analysis-v1.st             # AnalysisData → AnalysisResult（解释数据，不产生数据）
 ├── response/    final-response-v1.st            # AnalysisResult → 中文 Markdown 回答
 │                unknown-response-v1.st          # UNKNOWN 兜底澄清（≤150 字）
@@ -709,8 +726,8 @@ agent:
       intent/intent-recognition: 2   # classpath 需存在 intent-recognition-v2.st
 ```
 
-- 基线版本在调用点代码显式声明（`render("intent","intent-recognition",1,vars)`）；配置覆盖决定实际生效版本
-- **灰度上线流程**：新建 v2 模板 → yml 指向 2 → 用 `agent.action` Timer 指标与审计表对比 v1/v2 效果 → 异常删掉该行即回滚
+- 基线版本在调用点代码显式声明（Phase 13 起 intent/parameter 五个模板基线为 2，`render("intent","intent-recognition",2,vars)`）；配置覆盖决定实际生效版本
+- **灰度上线流程**：新建 vN 模板 → yml 指向 N → 用 `agent.action` Timer 指标与审计表对比效果 → 异常删掉该行即回滚（v1 全部保留，回滚 = 配置指向 1）
 - **Prompt 与代码的契约**：Output Contract = Domain record 的 schema；改输出结构必须同步改 record 并递增版本号
 - 实际生效版本可通过 `PromptRegistry.activeVersion()` 查询（供审计/日志记录）
 
@@ -784,6 +801,8 @@ agent:
 ### 10.3 审计落库（MySqlAgentExecutionRecorder）
 
 装饰器模式：`MetricsAgentExecutionRecorder`（`@Primary`）→ 委托 MySQL 审计 + 叠加指标。生命周期：`onExecutionStart`（RUNNING 入库）→ `onActionComplete`（每个 Action 明细：名称/产出类型/耗时/错误）→ `onExecutionEnd`（终态 + duration）。**失败历史同样完整留痕**（Phase 12 两轮失败 + 最终成功的执行均在表中可查）。
+
+> Phase 13 审计补线：`onActionComplete` 的触发源是 `AgentAuditEventListener`（Embabel `AgenticEventListener` SPI，见 §5.8）——此前该回调在生产代码中无调用方，Action 明细实际从未落库。
 
 ### 10.4 OTel Tracing 与日志
 
@@ -964,6 +983,11 @@ embabel:
         openai:
           api-key: ${LLM_API_KEY:}
           base-url: ${LLM_BASE_URL:https://api.openai.com}/v1   # ← 必须带 /v1（见 §11.6）
+          max-attempts: 3                  # Phase 13 交互调优（默认 10 次×5s×5^n ≈ 3 分钟）
+          backoff-millis: 2000             #   3 次×2s 起步×2 倍退避 ≈ 10s 内收敛
+          backoff-multiplier: 2.0
+          connect-timeout: 10s             # 1.5.3 新增（OpenAiCompatibleClientProperties）
+          read-timeout: 180s               # 1.5.3 新增；容纳推理模型单次 ~117s 实测耗时
 
 management:
   endpoints.web.exposure.include: health,info,metrics,prometheus
@@ -988,16 +1012,19 @@ logging:
 
 ## 13. 测试体系
 
-### 13.1 总览（26 个，`mvn test` 全绿）
+### 13.1 总览（53 个，`mvn test` 全绿）
 
 | 模块 | 数量 | 覆盖 |
 |---|---|---|
+| domain | 6 | ConversationHistory（transcript 格式 / 300 字截断 / 空历史占位 / null 语义） |
 | core | 6 | TenantContext（require 失败方向 = PERMISSION_DENIED / 清理）；PromptRegistry（基线渲染 / 灰度覆盖 / 缺模板快速失败） |
-| infrastructure | 4 | 统计口径（COUNT 总量单行 / MAX 默认 top1 降序 / MIN 升序 / ENTERPRISE_COUNT 不支持组合时快速失败） |
+| infrastructure | 8 | Redis 存储行解析（role\|content 分割 / 内容含 \| / 畸形行跳过）；统计口径（COUNT 总量单行 / MAX 默认 top1 降序 / MIN 升序 / ENTERPRISE_COUNT 不支持组合时快速失败） |
 | rag | 8 | 隔离表达式（租户等值必有 / documentType 可选 / 无 restricted 权限强制 public / 注入清洗）；检索请求构造（topK/查询词/过滤表达式）；摄入（tenantId 只取自上下文 / 切块边界 / visibility 规范化） |
 | tool | 5 | 权限评估（未登记 DENY / 显式 ALLOW / `*` 通配 / 按权限点判定） |
-| api | 3 | 鉴权过滤器（头解析 / 401 / ThreadLocal 清理 / 非 API 路径放行） |
-| application | 5 | Agent 集成 ×2（ENTERPRISE_QUERY 全链路 7 Action 且其余服务**零调用**；UNKNOWN 兜底**零副作用**）；HTTP 冒烟 ×3（200 响应结构+审计+记忆写入 / 401 / 400 参数校验） |
+| api | 9 | 鉴权过滤器（头解析 / 401 / ThreadLocal 清理 / 非 API 路径放行）；错误分类（ExecutionException 包装 TransientAiException → LLM_ERROR 可重试 / openai SDK 前缀匹配 → LLM_ERROR 不可重试 / ActionException 无 LLM 签名 → TOOL_ERROR / 无关异常 → BUSINESS_ERROR / 请求体不可读 → 400） |
+| application | 11 | Agent 集成 ×3（ENTERPRISE_QUERY 全链路且其余服务**零调用**；UNKNOWN 兜底**零副作用**；**多轮追问：历史注入意图 Prompt 且按 tenant+session 读取**）；HTTP 冒烟 ×3（200 响应结构+审计+记忆写入 / 401 / 400 参数校验）；审计事件监听 ×5（成功/失败映射 / 无上下文跳过 / 无关事件忽略 / typePart 解析） |
+
+> Phase 12 文档曾写"26 个测试"，实际基线为 **31 个**（core 6 / infra 4 / tool 5 / rag 8 / api 3 / application 5）——Phase 13 复核修正。
 
 ### 13.2 离线测试策略（无真实 LLM / MySQL / ES / Redis）
 
@@ -1026,21 +1053,24 @@ mvn test -pl enterprise-ai-agent-application   # 只跑集成+冒烟
 4. **record 上 `@Component` + `@ConfigurationProperties` 并存 = 启动崩**——只留 `@ConfigurationProperties` + Scan。
 5. **Boot 4 起 web starter 更名**：`spring-boot-starter-webmvc`（不再是 `spring-boot-starter-web`）。
 
-### 14.2 Embabel 1.5.0 关键事实（源码/字节码核实）
+### 14.2 Embabel 1.5.3 关键事实（源码/字节码核实）
 
-1. **线程模型**：SIMPLE 模式的 Action 同样跑在 `embabel-virtual` 虚拟线程（`AgentPlatform.start` 经 `Asyncer.async` 提交，每任务新建线程）——**不要**认为"SIMPLE = 调用线程执行"；ThreadLocal 选型必须 Inheritable（本项目 TenantContext 已处理）。
-2. **SimpleAgentProcess 不调用 callbacks**；ConcurrentAgentProcess 才走 `AgentProcessCallback` 钩子（beforeActionLaunched 捕获 / onActionLaunched 恢复 / onActionCompleted 清理），回调实例被平台单例持有，**快照不能存实例字段**（跨请求竞态 = 租户串写）。
+1. **线程模型**：SIMPLE 模式的 Action 同样跑在 `embabel-virtual` 虚拟线程（`AgentPlatform.start` 经 `Asyncer.async` 提交，每任务新建线程）——**不要**认为"SIMPLE = 调用线程执行"；ThreadLocal 选型必须 Inheritable（本项目 TenantContext 与 AgentExecutionContext 均已处理）。
+2. **SimpleAgentProcess 不调用 callbacks**；ConcurrentAgentProcess 才走 `AgentProcessCallback` 钩子（beforeActionLaunched 捕获 / onActionLaunched 恢复 / onActionCompleted 清理），回调实例被平台单例持有，**快照不能存实例字段**（跨请求竞态 = 租户串写）。Action 级事件观察走 `AgenticEventListener` SPI（容器内全部实现 Bean 被平台自动组播，本项目 `AgentAuditEventListener` 即此机制）。
 3. **LLM 接入走官方 openai-java SDK（com.openai），不是 Spring AI 客户端**：URL = baseUrl + `chat/completions`（固定相对路径）→ embabel base-url 必须带 `/v1`；`completions` / `embeddings-path` 属性是废弃空操作。
-4. **LLM 失败重试**：退避 5s×5^n×10 次 ≈ 3 分钟才报错；交互场景可用 `embabel...max-attempts` 调小。
-5. **`@Action(toolGroups=...)` 是已废弃旧 API**（GitHub README 残留）；1.5.0 工具机制 = 领域对象 `@LlmTool` + `PromptRunner.withToolChainingFrom(type)`。本项目工具走 Spring AI `@Tool` + 自建权限注册中心，与 Embabel 工具链并行。
+4. **LLM 失败重试**（1.5.2/1.5.3 已修复重试策略与限流检测）：默认仍为 10 次×5s×5^n 退避；本项目已配置 `max-attempts: 3` + `backoff-millis: 2000` + `backoff-multiplier: 2.0`（见 §12.2），另用 1.5.3 新增 `connect-timeout`/`read-timeout` 约束单次调用时长。
+5. **`@Action(toolGroups=...)` 是已废弃旧 API**（GitHub README 残留）；1.5.x 工具机制 = 领域对象 `@LlmTool` + `PromptRunner.withToolChainingFrom(type)`。本项目工具走 Spring AI `@Tool` + 自建权限注册中心，与 Embabel 工具链并行。
 6. **Elasticsearch 必须 9.x 服务端**：Spring AI 2.0 rest5 客户端对 ES 8 的 `indices.exists` HEAD 请求返回 400 无体；ES 8 数据卷不能原地升级，须删卷重建。
+7. **`AgentInvocation.invoke` 经 `CompletableFuture.get()` 上抛失败**（Phase 13 实证）：Action 失败到达 Controller 时是 `ExecutionException` 包装而非裸 `ActionException`——错误分类必须沿 cause 链探测（`GlobalExceptionHandler.diagnoseLlmFailure`）。
+8. **Kotlin 值类互操作**（Phase 13 实证）：`IoBinding` 是 `@JvmInline value class`，Java 侧无法调用其 `getType()`（字节码中为静态 `getType-impl` 混淆名）——须走 `toString()`（返回 "name:Type" 原文）再解析。
+9. **1.5.3 新增 `AchievableGoalValidator`**：@AchievesGoal 方法必须同时标注 @Action，否则部署被拒（本项目两个 Goal Action 均合规）。
 
 ### 14.3 遗留小项（不阻塞，按需处理）
 
-- LLM 失败分类宜为 `LLM_ERROR`（现为 BUSINESS_ERROR 兜底）
-- `HttpMessageNotReadableException` 宜映射 400 VALIDATION_ERROR（现为 500 兜底）
-- 3 分钟退避重试对交互场景偏长（`embabel...max-attempts` 可调小）
-- 会话记忆（`ConversationStore.recentMessages`）已具备，但当前对话链路未把历史喂给意图识别——多轮追问的上下文注入是预留的下一步
+- ~~LLM 失败分类宜为 `LLM_ERROR`~~ ✅ Phase 13 已修复（cause 链探测 Spring AI retry / openai SDK 异常）
+- ~~`HttpMessageNotReadableException` 宜映射 400~~ ✅ Phase 13 已修复
+- ~~3 分钟退避重试对交互场景偏长~~ ✅ Phase 13 已配置 max-attempts=3 + 超时
+- ~~多轮追问的上下文注入~~ ✅ Phase 13 已交付（loadConversationHistory + v2 模板）
 - 知识库摄入暂无 REST 端点（编程调用）
 
 ---
@@ -1092,7 +1122,7 @@ embabel_project/
 │
 ├── enterprise-ai-agent-agent/             # Agent 编排（Embabel）
 │   └── src/main/java/.../agent/assistant/
-│       └── EnterpriseAssistantAgent.java  # @Agent + 16 @Action + 5 @Condition + 2 @AchievesGoal
+│       └── EnterpriseAssistantAgent.java  # @Agent + 17 @Action + 5 @Condition + 2 @AchievesGoal
 │
 ├── enterprise-ai-agent-api/              # REST 接入
 │   └── src/main/java/.../api/
@@ -1106,12 +1136,13 @@ embabel_project/
         ├── java/.../application/
         │   ├── EnterpriseAiAgentApplication.java   # 主类（4 个扫描注解）
         │   └── config/             # Metrics 装饰器 / SpringAiConfig / 租户传播 Callback
+        │                            #   / AgentAuditEventListener（Action 事件→审计补线，Phase 13）
         ├── resources/
-        │   ├── application.yml     # 全部配置（见 §12）
+        │   ├── application.yml     # 全部配置（见 §12；含 embabel 重试/超时调优）
         │   ├── db/schema.sql + data.sql
-        │   ├── prompts/            # 8 个 .st 模板 + README（灰度流程）
+        │   ├── prompts/            # 13 个 .st 模板（5 个 v2 生效 + 8 个 v1 保留回滚）+ README
         │   └── static/index.html   # 聊天界面
-        └── test/                   # Agent 集成 ×2 + HTTP 冒烟 ×3
+        └── test/                   # Agent 集成 ×3 + HTTP 冒烟 ×3
 ```
 
 ---

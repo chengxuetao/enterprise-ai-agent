@@ -16,6 +16,15 @@ public class AgentExecutionContext {
 
     public enum ExecutionStatus { RUNNING, SUCCEEDED, FAILED }
 
+    /**
+     * InheritableThreadLocal（与 TenantContext 同一选型与论证，见 README §5.2.1）：
+     * Embabel 1.5 的 AgentPlatform.start 经 Asyncer.async 把每个任务提交到新建的
+     * embabel-virtual 虚拟线程执行——普通 ThreadLocal 在 Action 线程不可见，
+     * 可继承快照使 Action 内可读取 executionId/sessionId（多轮历史加载、审计事件
+     * 均依赖此行为）；每任务新建线程、不复用，无线程池脏读风险。
+     */
+    private static final InheritableThreadLocal<AgentExecutionContext> CURRENT = new InheritableThreadLocal<>();
+
     private final String executionId;
     private final String sessionId;
     private final UserContext user;
@@ -28,8 +37,6 @@ public class AgentExecutionContext {
     private final Map<String, Object> toolResults = new LinkedHashMap<>();
     private ExecutionStatus status = ExecutionStatus.RUNNING;
     private String errorMessage;
-
-    private static final ThreadLocal<AgentExecutionContext> CURRENT = new ThreadLocal<>();
 
     private AgentExecutionContext(String executionId, String sessionId, UserContext user, UserRequest request) {
         this.executionId = executionId;

@@ -35,3 +35,22 @@ prompts/
 每个 .st 的 Output Contract 一节描述的输出结构 = 对应 Domain 记录
 （带 `@JsonPropertyDescription` 的 schema 约束）。**改 Prompt 输出结构必须同步改
 Domain 记录并递增版本号**，二者共同构成 LLM 结构化输出的契约面。
+
+## 当前版本与多轮上下文（Phase 13）
+
+| 模板 | 生效版本 | 说明 |
+|---|---|---|
+| intent/intent-recognition | **v2**（基线，代码声明） | 新增 `{history}`：最近 10 条历史对话，追问继承上文意图 |
+| parameter/enterprise-query | **v2**（基线，代码声明） | 新增 `{history}`：追问继承上文查询条件 |
+| parameter/alarm-query | **v2**（基线，代码声明） | 同上，保留 `{current_time}` |
+| parameter/statistics-query | **v2**（基线，代码声明） | 同上，保留 `{current_time}` |
+| parameter/knowledge-query | **v2**（基线，代码声明） | 新增 `{history}`：结合上文改写独立完整检索问句 |
+| analysis/data-analysis | v1 | 不变（分析对象是结构化 AnalysisData，无需历史） |
+| response/final-response | v1 | 不变 |
+| response/unknown-response | v1 | 不变 |
+
+- v1 模板全部保留在 classpath，回滚 = yml 加一行 `agent.prompts.active-versions.{category/name}: 1`。
+- `{history}` 由 Agent 的 `loadConversationHistory` Action 产出（`ConversationHistory.transcript()`），
+  首轮对话或会话记忆不可用时为"（无历史对话）"——**占位符恒有值**，模板不会残留未替换标记。
+- 历史规则铁律：只能引用历史中明确出现过的条件，禁止编造（各 v2 模板 Rules 均有对应条目）。
+
